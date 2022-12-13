@@ -16,10 +16,9 @@ FFMPEG
 
 ```
 https://ffmpeg.org/download.html
-
-(Note: Set Environment Variable [User] Path for FFMPEG.exe :: https://www.wikihow.com/Install-FFmpeg-on-Windows)
 ```
-
+(Note: Set Environment Variable [User] Path for FFMPEG.exe :: https://www.wikihow.com/Install-FFmpeg-on-Windows)
+<br><br>
 POWERSHELL >= v7.0
 
 ```
