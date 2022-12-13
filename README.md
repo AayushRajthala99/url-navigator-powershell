@@ -2,12 +2,12 @@
 
 (o) Objective:
 
-- To record Screen & capture Screenshots of URLs listed in a .txt file via Powershell & FFMPEG.
+- To Record Screen & capture Screenshots of URLs listed in a .txt file via Powershell & FFMPEG.
 - Capture Header Responses as Logs for each URLs.
 
 (o) Done:
 
-- Added screen record & screenshot functionality after browser navigation to URL.
+- Added Screen Record & Screenshot Functionality after browser navigation to URL.
 - Record Header Responses in './responses/' based on timestamps.
 
 (o) Pre-requisites:
