@@ -22,6 +22,7 @@ if ($urls.Length -ne 0) {
 
         #Filename Generation Operation...
         $filename = $url.Replace('https://', '')
+        $filename = $filename.Replace('http://', '')
         $filename = $timestamp + "_" + $count + "_" + $filename.Replace('/', '_')
 
         # Response Log Generation...
@@ -41,7 +42,8 @@ if ($urls.Length -ne 0) {
                 $cdFlag = $true
             }
         }
-
+        
+        Start-Sleep -Seconds 1
         & 'C:\Program Files\Google\Chrome\Application\chrome.exe' --incognito --new-tab --start-maximized $url
         Start-Sleep -Seconds 1
 
