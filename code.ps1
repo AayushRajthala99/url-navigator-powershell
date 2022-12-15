@@ -29,9 +29,6 @@ if ($urls.Length -ne 0) {
     
     Write-Output '[ URL-NAVIGATOR-POWERSHELL ] Developed By Aayush Rajthala!'
     
-    # Keystrokes Generation Object...
-    # $wshell = New-Object -ComObject wscript.shell;
-    
     # Timestamp, Count for Unique Identity of Files & Folders...
     $count = 1
     $timestamp = Get-Date -Format "yyyyMMddTHHmmss"
@@ -39,7 +36,7 @@ if ($urls.Length -ne 0) {
     
     # Directory Generation...
     New-Item ".\recordings\$directoryName" -itemType Directory
-    # New-Item ".\responses\$directoryName" -itemType Directory
+    New-Item ".\responses\$directoryName" -itemType Directory
     New-Item ".\screenshots\$directoryName" -itemType Directory
 
     ForEach ($url in $urls) {
@@ -51,24 +48,37 @@ if ($urls.Length -ne 0) {
         $filename = $count + "_" + $filename.Replace('/', '_')
         $count = $count + 1
 
+        $response = Invoke-WebRequest -Uri $url
+
+        # Flags for Accept-Ranges & Content-Disposition...
+        $arFlag = $false
+        $cdFlag = $false
+
+        if (($response.Headers.'Accept-Ranges'.Length -gt 0) -and ($response.Headers.'Accept-Ranges'.Contains('none'))) {
+            $arFlag = $true    
+        }
+
+        if ($response.Headers.'Content-Disposition'.Length -ne 0) {
+            $cdFlag = $true
+        }
+
         # Response Log Generation...
-        # curl -sSL -D ./responses/$directoryName/$filename.txt $url | Out-Null
-        # $response = Get-Content -Path .\responses\$directoryName\$filename.txt
+        $jsonfile = ".\responses\$directoryName\$filename.json"
+        $response | Select-Object -Property StatusCode, StatusDescription, RawContent, Headers | ConvertTo-Json | Out-File $jsonfile
+        $response = Get-Content $jsonfile | Out-String | ConvertFrom-Json
 
-        #Flags for Accept-Ranges & Content-Disposition...
-        # $arFlag = $false
-        # $cdFlag = $false
-
-        # ForEach ($i in $response) {
-        #     if ($i.contains('Accept-Ranges') -and !($i.contains('Accept-Ranges: none'))) {
-        #         $arFlag = $true
-        #     }
-
-        #     if ($i.contains('content-disposition')) {
-        #         $cdFlag = $true
-        #     }
-        # }
+        $response | Add-Member -Type NoteProperty -Name 'url' -Value $url
         
+        # Flags Check for Downloadable-Status...
+        if ($arFlag -or $cdFlag) {
+            $response | Add-Member -Type NoteProperty -Name 'Downloadable' -Value 'True'
+        }
+        else {
+            $response | Add-Member -Type NoteProperty -Name 'Downloadable' -Value 'False'
+        }
+        
+        $response | ConvertTo-Json | Set-Content $jsonfile
+
         Start-Sleep -Seconds 1
         & 'C:\Program Files\Google\Chrome\Application\chrome.exe' --incognito --new-window --start-maximized $url
         Start-Sleep -Seconds 2
@@ -82,13 +92,6 @@ if ($urls.Length -ne 0) {
         # Screenshot Operation...
         ffmpeg -i .\recordings\$directoryName\$filename.mp4 -ss $screenshotTime -frames:v 1 -q:v 2 .\screenshots\$directoryName\$filename.jpeg
 
-        # # Flags Check for Downloadable-Status...
-        # if ($arFlag -or $cdFlag) {
-        #     Add-Content .\responses\$directoryName\$filename.txt "`nDownloadable-Status: True"
-        # }
-        # else {
-        #     Add-Content .\responses\$directoryName\$filename.txt "`nDownloadable-Status: False"
-        # }
         Stop-Process -Name chrome
 
         $testConfirm = Read-Host -Prompt "Save Test Results? Type [CONFIRM] to CONFIRM: "
@@ -102,9 +105,9 @@ if ($urls.Length -ne 0) {
         }
         else {
             Remove-Item ".\recordings\$directoryName" -Recurse
-            # Remove-Item ".\responses\$directoryName" -Recurse
+            Remove-Item ".\responses\$directoryName" -Recurse
             Remove-Item ".\screenshots\$directoryName" -Recurse
-            Write-Output $($testName + ' Discarded!')
+            Write-Output $($testName + 'Test Discarded!')
             Exit
         }
     }
