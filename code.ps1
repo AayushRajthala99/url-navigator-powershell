@@ -15,7 +15,7 @@ if ($urls.Length -ne 0) {
     New-Item ".\screenshots\$timestamp" -itemType Directory
 
     # Browser Initialization in Incognito Mode... 
-    & 'C:\Program Files\Google\Chrome\Application\chrome.exe' --incognito --new-tab --start-maximized 'chrome://newtab'
+    & 'C:\Program Files\Google\Chrome\Application\chrome.exe' --incognito --new-window --start-maximized 'chrome://newtab'
 
     ForEach ($url in $urls) {
         $url = $url.Trim() # Removes white/blank spaces from URLs...
@@ -24,6 +24,7 @@ if ($urls.Length -ne 0) {
         $filename = $url.Replace('https://', '')
         $filename = $filename.Replace('http://', '')
         $filename = $timestamp + "_" + $count + "_" + $filename.Replace('/', '_')
+        $count = $count + 1
 
         # Response Log Generation...
         curl -sSL -D ./responses/$timestamp/$filename.txt $url | Out-Null
@@ -45,14 +46,13 @@ if ($urls.Length -ne 0) {
         
         Start-Sleep -Seconds 1
         & 'C:\Program Files\Google\Chrome\Application\chrome.exe' --incognito --new-tab --start-maximized $url
-        Start-Sleep -Seconds 1
-
-        $title = (get-process chrome | Select-Object MainWindowTitle)
+        Start-Sleep -Seconds 2
+        $title = (Get-Process -Name chrome | Select-Object MainWindowTitle)
         ForEach ($i in $title) { if ($i.mainWindowTitle -ne '') { $title = $i.mainWindowTitle; break; } }
-        Write-Output $title
+        $ffmpegTitle = 'title=' + $title
 
         # Screen Record Operation...
-        ffmpeg -f gdigrab -i title=$title -loglevel panic -t 00:00:10.00 -s hd1080 -aspect 16:9 -an -vcodec libx264 .\recordings\$timestamp\$filename.mp4
+        ffmpeg -f gdigrab -i $ffmpegTitle -loglevel panic -t 00:00:10.00 -s hd1080 -aspect 16:9 -an -vcodec libx264 .\recordings\$timestamp\$filename.mp4
 
         # Screenshot Operation...
         ffmpeg -i .\recordings\$timestamp\$filename.mp4 -ss 00:00:09.50 -frames:v 1 -q:v 2 .\screenshots\$timestamp\$filename.jpeg
@@ -68,7 +68,6 @@ if ($urls.Length -ne 0) {
         else {
             Add-Content .\responses\$timestamp\$filename.txt "`nDownloadable-Status: False"
         }
-        $count = $count + 1
     }
     Stop-Process -Name chrome
 }
