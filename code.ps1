@@ -1,11 +1,12 @@
 $filePath = $args[0]
-$duration = $args[1]
-$testName = $args[2]
+$testName = $args[1]
+$duration = $args[2]
 
-if (($filePath.Length -eq 0) -or ($duration.Length -eq 0) -or ($testName.Length -eq 0)) {
+$defaultDuration = 5 # Default Duration Set to 5 Seconds...
+
+if (($filePath.Length -eq 0) -or ($testName.Length -eq 0)) {
     $message = ''
     if ($filePath.Length -eq 0) { $message = $message + ' <filePath>' }
-    if ($duration.Length -eq 0) { $message = $message + ' <RecordDurationinSeconds>' }
     if ($testName.Length -eq 0) { $message = $message + ' <testName>' }
     Write-Output $('--Missing Arguments:' + $message)
     Exit
@@ -16,17 +17,23 @@ if (!$filePath.Contains('.txt')) {
     Exit
 }
 
-if ($duration -gt 4) {
-    $screenshotTime = $duration - 1
-    $duration = [timespan]::fromseconds($duration)
-    $duration = $duration.ToString("hh\:mm\:ss\.ff")
-    $screenshotTime = [timespan]::fromseconds($screenshotTime)
-    $screenshotTime = $screenshotTime.ToString("hh\:mm\:ss\.ff")
+if ($duration.Length -gt 0) {
+    if ($duration -lt 5) {
+        Write-Output $('--Duration < 5 Seconds: Duration set to Default Values [ ' + $defaultDuration + ' Seconds ]')
+        $duration = $defaultDuration
+    }
 }
 else {
-    Write-Output 'Enter Time Greater Than 4 Seconds!'
-    Exit
+    Write-Output $('--Duration Argument Missing: Duration set to Default Values [ ' + $defaultDuration + ' Seconds ]')
+    $duration = $defaultDuration
 }
+
+# Screen Record & Screenshot Duration Calulation..
+$screenshotTime = $duration - 1
+$duration = [timespan]::fromseconds($duration)
+$duration = $duration.ToString("hh\:mm\:ss\.ff")
+$screenshotTime = [timespan]::fromseconds($screenshotTime)
+$screenshotTime = $screenshotTime.ToString("hh\:mm\:ss\.ff")
 
 $urls = Get-Content -Path $filePath
 
@@ -34,23 +41,29 @@ if ($urls.Length -ne 0) {
     
     Write-Output '[ URL-NAVIGATOR-POWERSHELL ] Developed By Aayush Rajthala!'
     
-    # Timestamp, Count for Unique Identity of Files & Folders...
+    # Timestamp, Count for Unique Identity of Files & Directories...
     $count = 1
-    $timestamp = Get-Date -Format "yyyyMMddTHHmmss"
+    $date = Get-Date -UFormat "%b-%d-%Y"
+    $time = Get-Date -Format "HH\H-mm\m-ss\s"
+    $timestamp = $date + '-' + $time
     $directoryName = $testName + '_' + $timestamp
     
     # Directory Generation...
-    New-Item ".\recordings\$directoryName" -itemType Directory
-    New-Item ".\responses\$directoryName" -itemType Directory
-    New-Item ".\screenshots\$directoryName" -itemType Directory
+    New-Item ".\results\$directoryName" -itemType Directory
+    New-Item ".\results\$directoryName\recordings" -itemType Directory
+    New-Item ".\results\$directoryName\responses" -itemType Directory
+    New-Item ".\results\$directoryName\screenshots" -itemType Directory
 
     ForEach ($url in $urls) {
         $url = $url.Trim() # Removes white/blank spaces from URLs...
 
         #Filename Generation Operation...
+        $fileCount = [string]$count
         $filename = $url.Replace('https://', '')
         $filename = $filename.Replace('http://', '')
-        $filename = $count + "_" + $filename.Replace('/', '_')
+        $filename = $filename.Replace('/', '_')
+        $filename = $filename -replace '[^a-zA-Z0-9.]', ''
+        $filename = $fileCount + '_' + $filename
         $count = $count + 1
 
         $response = Invoke-WebRequest -Uri $url
@@ -68,7 +81,7 @@ if ($urls.Length -ne 0) {
         }
 
         # Response Log Generation...
-        $jsonfile = ".\responses\$directoryName\$filename.json"
+        $jsonfile = ".\results\$directoryName\responses\$filename.json"
         $response | Select-Object -Property StatusCode, StatusDescription, RawContent, Headers | ConvertTo-Json | Out-File $jsonfile
         $response = Get-Content $jsonfile | Out-String | ConvertFrom-Json
 
@@ -92,29 +105,27 @@ if ($urls.Length -ne 0) {
         $ffmpegTitle = 'title=' + $title
 
         # Screen Record Operation...
-        ffmpeg -f gdigrab -i $ffmpegTitle -loglevel panic -t $duration -s hd1080 -aspect 16:9 -an -vcodec libx264 .\recordings\$directoryName\$filename.mp4
+        ffmpeg -f gdigrab -i $ffmpegTitle -loglevel panic -t $duration -s hd1080 -aspect 16:9 -an -vcodec libx264 .\results\$directoryName\recordings\$filename.mp4
 
         # Screenshot Operation...
-        ffmpeg -i .\recordings\$directoryName\$filename.mp4 -ss $screenshotTime -frames:v 1 -q:v 2 .\screenshots\$directoryName\$filename.jpeg
+        ffmpeg -i .\results\$directoryName\recordings\$filename.mp4 -ss $screenshotTime -frames:v 1 -q:v 2 .\results\$directoryName\screenshots\$filename.jpeg
 
         Stop-Process -Name chrome
+    }
+    $testConfirm = Read-Host -Prompt "Save Test Results? Type [CONFIRM] to CONFIRM: "
+    $testConfirm = $testConfirm.ToUpper()
+    $confirmDecision = Read-Host -Prompt "Are You Sure? [Y/N]: "
+    $confirmDecision = $confirmDecision.ToUpper()
 
-        $testConfirm = Read-Host -Prompt "Save Test Results? Type [CONFIRM] to CONFIRM: "
-        $testConfirm = $testConfirm.ToUpper()
-        $confirmDecision = Read-Host -Prompt "Are You Sure? [Y/N]: "
-        $confirmDecision = $confirmDecision.ToUpper()
-
-        if (($testConfirm -eq 'CONFIRM') -and ($confirmDecision -eq 'Y')) {
-            Write-Output $('--' + $testName + ' Test Completed!')
-            Exit
-        }
-        else {
-            Remove-Item ".\recordings\$directoryName" -Recurse
-            Remove-Item ".\responses\$directoryName" -Recurse
-            Remove-Item ".\screenshots\$directoryName" -Recurse
-            Write-Output $($testName + 'Test Discarded!')
-            Exit
-        }
+    if (($testConfirm -eq 'CONFIRM') -and ($confirmDecision -eq 'Y')) {
+        Copy-Item ".\urls.txt" -Destination ".\results\$directoryName\"
+        Write-Output $('--' + $testName + ' Test Completed!')
+        Exit
+    }
+    else {
+        Remove-Item ".\results\$directoryName" -Recurse
+        Write-Output $($testName + 'Test Discarded!')
+        Exit
     }
 }
 else {
