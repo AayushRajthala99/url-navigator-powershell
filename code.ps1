@@ -112,6 +112,8 @@ if ($urls.Length -ne 0) {
 
         Stop-Process -Name chrome
     }
+
+    # Test Confirmation Operation...
     $testConfirm = Read-Host -Prompt "Save Test Results? Type [CONFIRM] to CONFIRM: "
     $testConfirm = $testConfirm.ToUpper()
     $confirmDecision = Read-Host -Prompt "Are You Sure? [Y/N]: "
@@ -123,6 +125,7 @@ if ($urls.Length -ne 0) {
         Exit
     }
     else {
+        # Delete All Results if Test Discarded...
         Remove-Item ".\results\$directoryName" -Recurse
         Write-Output $($testName + 'Test Discarded!')
         Exit

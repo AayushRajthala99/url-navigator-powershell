@@ -17,6 +17,7 @@ FFMPEG
 ```
 https://ffmpeg.org/download.html
 ```
+
 (Note: Set Environment Variable [User] Path for FFMPEG.exe :: https://www.wikihow.com/Install-FFmpeg-on-Windows)
 <br><br>
 POWERSHELL >= v7.0
@@ -34,5 +35,5 @@ https://www.google.com/chrome/
 To Execute the Script
 
 ```shell
-PS> screenshot-automation-powershell/code.ps1 [Enter]
+PS> ./code.ps1 <filePath> <testName> <screenRecordDurationInSeconds>[Enter]
 ```
