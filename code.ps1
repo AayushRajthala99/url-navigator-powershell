@@ -18,8 +18,8 @@ if (!$filePath.Contains('.txt')) {
 }
 
 if ($duration.Length -gt 0) {
-    if ($duration -lt 5) {
-        Write-Output $('--Duration < 5 Seconds: Duration set to Default Values [ ' + $defaultDuration + ' Seconds ]')
+    if ($duration -lt $defaultDuration) {
+        Write-Output $('--Duration < ' + $defaultDuration + ' Seconds: Duration set to Default Values [ ' + $defaultDuration + ' Seconds ]')
         $duration = $defaultDuration
     }
 }
@@ -56,78 +56,86 @@ if ($urls.Length -ne 0) {
 
     ForEach ($url in $urls) {
         $url = $url.Trim() # Removes white/blank spaces from URLs...
+        if ($url.Length -gt 0) {
+            #Filename Generation Operation...
+            $fileCount = [string]$count
+            $filename = $url.Replace('https://', '')
+            $filename = $filename.Replace('http://', '')
+            $filename = $filename.Replace('/', '_')
+            $filename = $filename -replace '[^a-zA-Z0-9.]', ''
+            $filename = $fileCount + '_' + $filename
+            $count = $count + 1
 
-        #Filename Generation Operation...
-        $fileCount = [string]$count
-        $filename = $url.Replace('https://', '')
-        $filename = $filename.Replace('http://', '')
-        $filename = $filename.Replace('/', '_')
-        $filename = $filename -replace '[^a-zA-Z0-9.]', ''
-        $filename = $fileCount + '_' + $filename
-        $count = $count + 1
+            Start-Sleep -Seconds 1
+            & 'C:\Program Files\Google\Chrome\Application\chrome.exe' --incognito --new-window --start-maximized $url
+            Start-Sleep -Seconds 2
+            $title = (Get-Process -Name chrome | Select-Object MainWindowTitle)
+            ForEach ($i in $title) { if ($i.mainWindowTitle -ne '') { $title = $i.mainWindowTitle; break; } }
+            $ffmpegTitle = 'title=' + $title
 
-        $response = Invoke-WebRequest -Uri $url
+            # Screen Record Operation...
+            ffmpeg -f gdigrab -i $ffmpegTitle -loglevel panic -t $duration -s hd1080 -aspect 16:9 -an -vcodec libx264 .\results\$directoryName\recordings\$filename.mp4
 
-        # Flags for Accept-Ranges & Content-Disposition...
-        $arFlag = $false
-        $cdFlag = $false
+            # Screenshot Operation...
+            ffmpeg -i .\results\$directoryName\recordings\$filename.mp4 -ss $screenshotTime -frames:v 1 -q:v 2 .\results\$directoryName\screenshots\$filename.jpeg
+            
+            $response = Invoke-WebRequest -Uri $url
 
-        if (($response.Headers.'Accept-Ranges'.Length -gt 0) -and !($response.Headers.'Accept-Ranges'.Contains('none'))) {
-            $arFlag = $true    
-        }
+            # Flags for Accept-Ranges & Content-Disposition...
+            $arFlag = $false
+            $cdFlag = $false
 
-        if ($response.Headers.'Content-Disposition'.Length -ne 0) {
-            $cdFlag = $true
-        }
+            if (($response.Headers.'Accept-Ranges'.Length -gt 0) -and !($response.Headers.'Accept-Ranges'.Contains('none'))) {
+                $arFlag = $true    
+            }
 
-        # Response Log Generation...
-        $jsonfile = ".\results\$directoryName\responses\$filename.json"
-        $response | Select-Object -Property StatusCode, StatusDescription, RawContent, Headers | ConvertTo-Json | Out-File $jsonfile
-        $response = Get-Content $jsonfile | Out-String | ConvertFrom-Json
+            if ($response.Headers.'Content-Disposition'.Length -ne 0) {
+                $cdFlag = $true
+            }
 
-        $response | Add-Member -Type NoteProperty -Name 'url' -Value $url
+            # Response Log Generation...
+            $jsonfile = ".\results\$directoryName\responses\$filename.json"
+            $response | Select-Object -Property StatusCode, StatusDescription, RawContent, Headers | ConvertTo-Json | Out-File $jsonfile
+            $response = Get-Content $jsonfile | Out-String | ConvertFrom-Json
+
+            $response | Add-Member -Type NoteProperty -Name 'url' -Value $url
         
-        # Flags Check for Downloadable-Status...
-        if ($arFlag -or $cdFlag) {
-            $response | Add-Member -Type NoteProperty -Name 'Downloadable' -Value 'True'
-        }
-        else {
-            $response | Add-Member -Type NoteProperty -Name 'Downloadable' -Value 'False'
-        }
+            # Flags Check for Downloadable-Status...
+            if ($arFlag -or $cdFlag) {
+                $response | Add-Member -Type NoteProperty -Name 'Downloadable' -Value 'True'
+            }
+            else {
+                $response | Add-Member -Type NoteProperty -Name 'Downloadable' -Value 'False'
+            }
         
-        $response | ConvertTo-Json | Set-Content $jsonfile
+            $response | ConvertTo-Json | Set-Content $jsonfile
 
-        Start-Sleep -Seconds 1
-        & 'C:\Program Files\Google\Chrome\Application\chrome.exe' --incognito --new-window --start-maximized $url
-        Start-Sleep -Seconds 2
-        $title = (Get-Process -Name chrome | Select-Object MainWindowTitle)
-        ForEach ($i in $title) { if ($i.mainWindowTitle -ne '') { $title = $i.mainWindowTitle; break; } }
-        $ffmpegTitle = 'title=' + $title
-
-        # Screen Record Operation...
-        ffmpeg -f gdigrab -i $ffmpegTitle -loglevel panic -t $duration -s hd1080 -aspect 16:9 -an -vcodec libx264 .\results\$directoryName\recordings\$filename.mp4
-
-        # Screenshot Operation...
-        ffmpeg -i .\results\$directoryName\recordings\$filename.mp4 -ss $screenshotTime -frames:v 1 -q:v 2 .\results\$directoryName\screenshots\$filename.jpeg
-
-        Stop-Process -Name chrome
+            Stop-Process -Name chrome
+        }
     }
 
-    # Test Confirmation Operation...
-    $testConfirm = Read-Host -Prompt "Save Test Results? Type [CONFIRM] to CONFIRM: "
-    $testConfirm = $testConfirm.ToUpper()
-    $confirmDecision = Read-Host -Prompt "Are You Sure? [Y/N]: "
-    $confirmDecision = $confirmDecision.ToUpper()
-
-    if (($testConfirm -eq 'CONFIRM') -and ($confirmDecision -eq 'Y')) {
-        Copy-Item ".\urls.txt" -Destination ".\results\$directoryName\"
-        Write-Output $('--' + $testName + ' Test Completed!')
-        Exit
+    # Test Confirm/Discard Operation...
+    $discardConfirm = Read-Host -Prompt "DISCARD TEST? Type [DISCARD] to DISCARD: "
+    $discardConfirm = $testConfirm.ToUpper()
+    
+    if ($discardConfirm -eq 'DISCARD') {
+        $confirmDecision = Read-Host -Prompt "Are You Sure? [Y/N]: "
+        $confirmDecision = $confirmDecision.ToUpper()
+        
+        if ($confirmDecision -eq 'Y') {
+            # Delete All Results if Test Discarded...
+            Remove-Item ".\results\$directoryName" -Recurse -Force
+            Write-Output $($testName + 'Test Discarded!')
+            Exit
+        }
     }
     else {
-        # Delete All Results if Test Discarded...
-        Remove-Item ".\results\$directoryName" -Recurse
-        Write-Output $($testName + 'Test Discarded!')
+        Copy-Item ".\urls.txt" -Destination ".\results\$directoryName\"
+        Move-Item -Path ".\tempDownloadFolder\*" -Destination ".\results\$directoryName\downloadedMalwares"
+        Remove-Item ".\results\downloadedMalwares" -Force
+        Remove-Item ".\tempDownloadFolder\" -Recurse -Force
+        New-Item ".\tempDownloadFolder" -itemType Directory
+        Write-Output $('--' + $testName + ' Test Completed!')
         Exit
     }
 }
