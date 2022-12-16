@@ -11,6 +11,11 @@ if (($filePath.Length -eq 0) -or ($duration.Length -eq 0) -or ($testName.Length 
     Exit
 }
 
+if (!$filePath.Contains('.txt')) {
+    Write-Output $('--Invalid File Type: Use *.txt Files Only!')
+    Exit
+}
+
 if ($duration -gt 4) {
     $screenshotTime = $duration - 1
     $duration = [timespan]::fromseconds($duration)
@@ -54,7 +59,7 @@ if ($urls.Length -ne 0) {
         $arFlag = $false
         $cdFlag = $false
 
-        if (($response.Headers.'Accept-Ranges'.Length -gt 0) -and ($response.Headers.'Accept-Ranges'.Contains('none'))) {
+        if (($response.Headers.'Accept-Ranges'.Length -gt 0) -and !($response.Headers.'Accept-Ranges'.Contains('none'))) {
             $arFlag = $true    
         }
 
