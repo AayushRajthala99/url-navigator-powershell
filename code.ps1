@@ -56,6 +56,7 @@ if ($urls.Length -ne 0) {
 
     ForEach ($url in $urls) {
         $url = $url.Trim() # Removes white/blank spaces from URLs...
+        
         if ($url.Length -gt 0) {
             #Filename Generation Operation...
             $fileCount = [string]$count
@@ -116,7 +117,7 @@ if ($urls.Length -ne 0) {
 
     # Test Confirm/Discard Operation...
     $discardConfirm = Read-Host -Prompt "DISCARD TEST? Type [DISCARD] to DISCARD: "
-    $discardConfirm = $testConfirm.ToUpper()
+    $discardConfirm = $discardConfirm.ToUpper()
     
     if ($discardConfirm -eq 'DISCARD') {
         $confirmDecision = Read-Host -Prompt "Are You Sure? [Y/N]: "
@@ -131,10 +132,6 @@ if ($urls.Length -ne 0) {
     }
     else {
         Copy-Item ".\urls.txt" -Destination ".\results\$directoryName\"
-        Move-Item -Path ".\tempDownloadFolder\*" -Destination ".\results\$directoryName\downloadedMalwares"
-        Remove-Item ".\results\downloadedMalwares" -Force
-        Remove-Item ".\tempDownloadFolder\" -Recurse -Force
-        New-Item ".\tempDownloadFolder" -itemType Directory
         Write-Output $('--' + $testName + ' Test Completed!')
         Exit
     }
