@@ -40,6 +40,9 @@ $urls = Get-Content -Path $filePath
 if ($urls.Length -ne 0) {
     
     Write-Output '[ URL-NAVIGATOR-POWERSHELL ] Developed By Aayush Rajthala!'
+
+    # Keystrokes Generation Object...
+    # $wshell = New-Object -ComObject wscript.shell;
     
     # Timestamp, Count for Unique Identity of Files & Directories...
     $count = 1
@@ -49,6 +52,12 @@ if ($urls.Length -ne 0) {
     $directoryName = $testName + '_' + $timestamp
     
     # Directory Generation...
+    if (!(Test-Path -Path ".\results")) {
+        New-Item ".\results" -itemType Directory    
+    }
+    if (!(Test-Path -Path ".\discardedResults")) {
+        New-Item ".\discardedResults" -itemType Directory    
+    }
     New-Item ".\results\$directoryName" -itemType Directory
     New-Item ".\results\$directoryName\recordings" -itemType Directory
     New-Item ".\results\$directoryName\responses" -itemType Directory
@@ -70,12 +79,13 @@ if ($urls.Length -ne 0) {
             Start-Sleep -Seconds 1
             & 'C:\Program Files\Google\Chrome\Application\chrome.exe' --incognito --new-window --start-maximized $url
             Start-Sleep -Seconds 2
+
             $title = (Get-Process -Name chrome | Select-Object MainWindowTitle)
             ForEach ($i in $title) { if ($i.mainWindowTitle -ne '') { $title = $i.mainWindowTitle; break; } }
             $ffmpegTitle = 'title=' + $title
 
             # Screen Record Operation...
-            ffmpeg -f gdigrab -i $ffmpegTitle -loglevel panic -t $duration -s hd1080 -aspect 16:9 -an -vcodec libx264 .\results\$directoryName\recordings\$filename.mp4
+            ffmpeg -f gdigrab -i $ffmpegTitle -hide_banner -loglevel error -t $duration -s hd1080 -aspect 16:9 -an -vcodec libx264 .\results\$directoryName\recordings\$filename.mp4
 
             # Screenshot Operation...
             ffmpeg -i .\results\$directoryName\recordings\$filename.mp4 -ss $screenshotTime -frames:v 1 -q:v 2 .\results\$directoryName\screenshots\$filename.jpeg
@@ -124,9 +134,10 @@ if ($urls.Length -ne 0) {
         $confirmDecision = $confirmDecision.ToUpper()
         
         if ($confirmDecision -eq 'Y') {
-            # Delete All Results if Test Discarded...
-            Remove-Item ".\results\$directoryName" -Recurse -Force
-            Write-Output $($testName + 'Test Discarded!')
+            # Move All Results if Test Discarded...
+            # Remove-Item ".\results\$directoryName" -Recurse -Force
+            Move-Item ".\results\$directoryName" -Destination ".\discardedResults\"
+            Write-Output $('--' + $testName + ' Test Discarded!')
             Exit
         }
     }
