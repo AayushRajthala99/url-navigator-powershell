@@ -62,6 +62,12 @@ if ($urls.Length -ne 0) {
     New-Item ".\results\$directoryName\recordings" -itemType Directory
     New-Item ".\results\$directoryName\responses" -itemType Directory
     New-Item ".\results\$directoryName\screenshots" -itemType Directory
+    New-Item ".\results\$directoryName\packetcaptures" -itemType Directory
+
+    $recordingPath = ".\results\$directoryName\recordings"
+    $responsePath = ".\results\$directoryName\responses"
+    $screenshotPath = ".\results\$directoryName\screenshots"
+    $packetcapturePath = ".\results\$directoryName\packetcaptures"
 
     ForEach ($url in $urls) {
         $url = $url.Trim() # Removes white/blank spaces from URLs...
@@ -76,21 +82,24 @@ if ($urls.Length -ne 0) {
             $filename = $fileCount + '_' + $filename
             $count = $count + 1
 
-            Start-Sleep -Seconds 1
-            & 'C:\Program Files\Google\Chrome\Application\chrome.exe' --incognito --new-window --start-maximized $url
+            $pcapFilePath = "$packetcapturePath\$filename" + '.pcap'
+            tshark -i $pcapInterface -w $pcapFilePath &
+            
+            # Browser Initialization in Incognito Mode... 
+            & "chrome.exe" --incognito --new-window --disable-web-security --ignore-certificate-errors --start-maximized $url
             Start-Sleep -Seconds 2
-
+            
             $title = (Get-Process -Name chrome | Select-Object MainWindowTitle)
             ForEach ($i in $title) { if ($i.mainWindowTitle -ne '') { $title = $i.mainWindowTitle; break; } }
             $ffmpegTitle = 'title=' + $title
 
             # Screen Record Operation...
-            ffmpeg -f gdigrab -i $ffmpegTitle -hide_banner -loglevel error -t $duration -s hd1080 -aspect 16:9 -an -vcodec libx264 .\results\$directoryName\recordings\$filename.mp4
+            ffmpeg -f gdigrab -framerate 12 -i $ffmpegTitle -loglevel error -t $duration -s hd1080 -aspect 16:9 -an -vcodec libx264 $recordingPath\$filename.mp4
 
             # Screenshot Operation...
-            ffmpeg -i .\results\$directoryName\recordings\$filename.mp4 -ss $screenshotTime -frames:v 1 -q:v 2 .\results\$directoryName\screenshots\$filename.jpeg
+            ffmpeg -i $recordingPath\$filename.mp4 -ss $screenshotTime -frames:v 1 -q:v 2 $screenshotPath\$filename.jpeg
             
-            $response = Invoke-WebRequest -Uri $url
+            $response = Invoke-WebRequest -SkipHeaderValidation -SkipHttpErrorCheck -SkipCertificateCheck -Uri  $navigationUrl
 
             # Flags for Accept-Ranges & Content-Disposition...
             $arFlag = $false
@@ -105,7 +114,7 @@ if ($urls.Length -ne 0) {
             }
 
             # Response Log Generation...
-            $jsonfile = ".\results\$directoryName\responses\$filename.json"
+            $jsonfile = "$responsePath\$filename.json"
             $response | Select-Object -Property StatusCode, StatusDescription, RawContent, Headers | ConvertTo-Json | Out-File $jsonfile
             $response = Get-Content $jsonfile | Out-String | ConvertFrom-Json
 
@@ -121,6 +130,8 @@ if ($urls.Length -ne 0) {
         
             $response | ConvertTo-Json | Set-Content $jsonfile
 
+            Get-Job | Stop-Job
+            Remove-Job *
             Stop-Process -Name chrome
         }
     }
