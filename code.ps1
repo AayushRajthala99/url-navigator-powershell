@@ -41,6 +41,9 @@ if ($urls.Length -ne 0) {
     
     Write-Output '[ URL-NAVIGATOR-POWERSHELL ] Developed By Aayush Rajthala!'
 
+    tshark -D
+    $pcapInterface = Read-Host -Prompt "Select Packet Capture Interface: "
+
     # Keystrokes Generation Object...
     # $wshell = New-Object -ComObject wscript.shell;
     
