@@ -89,6 +89,7 @@ if ($urls.Length -ne 0) {
             tshark -i $pcapInterface -w $pcapFilePath &
             
             # Browser Initialization in Incognito Mode... 
+            Start-Sleep -Seconds 1
             & "chrome.exe" --incognito --new-window --disable-web-security --ignore-certificate-errors --start-maximized $url
             Start-Sleep -Seconds 2
             
@@ -102,7 +103,7 @@ if ($urls.Length -ne 0) {
             # Screenshot Operation...
             ffmpeg -i $recordingPath\$filename.mp4 -ss $screenshotTime -frames:v 1 -q:v 2 $screenshotPath\$filename.jpeg
             
-            $response = Invoke-WebRequest -SkipHeaderValidation -SkipHttpErrorCheck -SkipCertificateCheck $navigationUrl
+            $response = Invoke-WebRequest -SkipHeaderValidation -SkipHttpErrorCheck -SkipCertificateCheck $url
 
             # Flags for Accept-Ranges & Content-Disposition...
             $arFlag = $false
@@ -127,7 +128,7 @@ if ($urls.Length -ne 0) {
             $response = Get-Content $jsonfile | Out-String | ConvertFrom-Json
     
             if ($null -ne $response) {
-                $response | Add-Member -Type NoteProperty -Name 'url' -Value $navigationUrl
+                $response | Add-Member -Type NoteProperty -Name 'url' -Value $url
             
                 # Flags Check for Downloadable-Status...
                 if ($arFlag -or $cdFlag -or $ctFlag) {
@@ -140,7 +141,7 @@ if ($urls.Length -ne 0) {
                 $response | ConvertTo-Json | Set-Content $jsonfile
             }
             else {
-                "{'url': $url,'status': 'Blocked'}" > $jsonfile
+                "{'url': $url,'status': 'No Response'}" > $jsonfile
             }
 
             Get-Job | Stop-Job
