@@ -14,7 +14,7 @@ if (($filePath.Length -eq 0) -or ($testName.Length -eq 0)) {
 }
 
 if (!$filePath.Contains('.txt')) {
-    Write-Output $('--ERROR--Invalid File Type: Use *.txt Files Only!')
+    Write-Output '--ERROR--Invalid File Type: Use *.txt Files Only!'
     Exit
 }
 
@@ -153,6 +153,6 @@ if ($urls.Length -ne 0) {
     }
 }
 else {
-    Write-Output "--[ $filePath ]--File is Empty!!!"
+    Write-Output "--ERROR--[ $filePath ]--File is Empty!!!"
     Exit
 }
