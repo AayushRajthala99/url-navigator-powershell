@@ -142,17 +142,17 @@ if ($urls.Length -ne 0) {
             # Move All Results if Test Discarded...
             Copy-Item ".\urls.txt" -Destination ".\results\$directoryName\"
             Move-Item ".\results\$directoryName" -Destination ".\discardedResults\"
-            Write-Output $('--' + $testName + ' Test Discarded!')
+            Write-Output "--[ $testName ]--Test Discarded!"
             Exit
         }
     }
     else {
         Copy-Item ".\urls.txt" -Destination ".\results\$directoryName\"
-        Write-Output $('--' + $testName + ' Test Completed!')
+        Write-Output "--[ $testName ]--Test Completed!"
         Exit
     }
 }
 else {
-    Write-Output $('--[ ' + $filePath + ' ]--File is Empty!!!')
+    Write-Output "--[ $filePath ]--File is Empty!!!"
     Exit
 }
