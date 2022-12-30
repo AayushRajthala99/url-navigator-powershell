@@ -3,32 +3,39 @@ $testName = $args[1]
 $duration = $args[2]
 
 $defaultDuration = 5 # Default Duration Set to 5 Seconds...
+$ErrorActionPreference = "SilentlyContinue"
 
 if (($filePath.Length -eq 0) -or ($testName.Length -eq 0)) {
     $message = ''
     if ($filePath.Length -eq 0) { $message = $message + ' <filePath>' }
     if ($testName.Length -eq 0) { $message = $message + ' <testName>' }
-    Write-Output $('--Missing Arguments:' + $message)
+    Write-Output "--ERROR--Missing Arguments: $message"
     Exit
 }
 
 if (!$filePath.Contains('.txt')) {
-    Write-Output $('--Invalid File Type: Use *.txt Files Only!')
+    Write-Output $('--ERROR--Invalid File Type: Use *.txt Files Only!')
     Exit
 }
 
 if ($duration.Length -gt 0) {
+    if ($duration.GetType().Name -ne 'Int32') {
+        Write-Output '--ERROR--Duration Value Must be Int32 Type'
+        Exit
+    }
+
     if ($duration -lt $defaultDuration) {
-        Write-Output $('--Duration < ' + $defaultDuration + ' Seconds: Duration set to Default Values [ ' + $defaultDuration + ' Seconds ]')
+        Write-Output "--ERROR--Duration < $defaultDuration Seconds: Duration set to Default Values [ $defaultDuration Seconds ]"
         $duration = $defaultDuration
     }
 }
 else {
-    Write-Output $('--Duration Argument Missing: Duration set to Default Values [ ' + $defaultDuration + ' Seconds ]')
+    Write-Output "--ERROR--Duration Argument Missing: Duration set to Default Values [ $defaultDuration Seconds ]"
     $duration = $defaultDuration
 }
 
 # Screen Record & Screenshot Duration Calulation..
+$responseTimeout = $duration - 1
 $screenshotTime = $duration - 1
 $duration = [timespan]::fromseconds($duration)
 $duration = $duration.ToString("hh\:mm\:ss\.ff")
@@ -51,104 +58,77 @@ if ($urls.Length -ne 0) {
     $count = 1
     $date = Get-Date -UFormat "%b-%d-%Y"
     $time = Get-Date -Format "HH\H-mm\m-ss\s"
-    $timestamp = $date + '-' + $time
+    $timestamp = "$date-$time"
     $directoryName = $testName + '_' + $timestamp
     
-    # Directory Generation...
-    if (!(Test-Path -Path ".\results")) {
-        New-Item ".\results" -itemType Directory    
-    }
-    if (!(Test-Path -Path ".\discardedResults")) {
-        New-Item ".\discardedResults" -itemType Directory    
-    }
-    New-Item ".\results\$directoryName" -itemType Directory
-    New-Item ".\results\$directoryName\recordings" -itemType Directory
-    New-Item ".\results\$directoryName\responses" -itemType Directory
-    New-Item ".\results\$directoryName\screenshots" -itemType Directory
-    New-Item ".\results\$directoryName\packetcaptures" -itemType Directory
-
+    Write-Output "Directory Generation in Progess!!!"
+    ./scripts/directorygeneration.ps1 $directoryName
+    Write-Output "Directory Generation in Progess!!!"
+    
     $recordingPath = ".\results\$directoryName\recordings"
     $responsePath = ".\results\$directoryName\responses"
     $screenshotPath = ".\results\$directoryName\screenshots"
-    $packetcapturePath = ".\results\$directoryName\packetcaptures"
 
     ForEach ($url in $urls) {
-        $url = $url.Trim() # Removes white/blank spaces from URLs...
+        try {
+            $url = $url.Trim() # Removes white/blank spaces from URLs...
         
-        if ($url.Length -gt 0) {
-            #Filename Generation Operation...
-            $fileCount = [string]$count
-            $filename = $url.Replace('https://', '')
-            $filename = $filename.Replace('http://', '')
-            $filename = $filename.Replace('/', '_')
-            $filename = $filename -replace '[^a-zA-Z0-9.]', ''
-            $filename = $fileCount + '_' + $filename
-            $count = $count + 1
+            if ($url.Length -gt 0) {
 
-            $pcapFilePath = "$packetcapturePath\$filename" + '.pcap'
-            tshark -i $pcapInterface -w $pcapFilePath &
+                # Clear Console Screen
+                Clear-Host
+
+                #Filename Generation Operation...
+                $fileCount = [string]$count
+                $filename = $url.Replace('https://', '')
+                $filename = $filename.Replace('http://', '')
+                $filename = $filename.Replace('/', '_')
+                $filename = $filename -replace '[^a-zA-Z0-9.]', ''
+                $filename = $fileCount + '_' + $filename
+                $count = $count + 1
+
+                Write-Output "Response Generation Operation Started!!!"
+                ./scripts/response.ps1 $responsePath $filename $url $responseTimeout &
+                
+                Write-Output "Packet Capture Operation Started!!!"
+                ./scripts/packetcapture.ps1 1 $pcapInterface $directoryName $filename &
             
-            # Browser Initialization in Incognito Mode... 
-            Start-Sleep -Seconds 1
-            & "chrome.exe" --incognito --new-window --disable-web-security --ignore-certificate-errors --start-maximized $url
-            Start-Sleep -Seconds 2
-            
-            $title = (Get-Process -Name chrome | Select-Object MainWindowTitle)
-            ForEach ($i in $title) { if ($i.mainWindowTitle -ne '') { $title = $i.mainWindowTitle; break; } }
-            $ffmpegTitle = 'title=' + $title
+                Write-Output "Browser Navigation Started!!!"
+                # Browser Initialization in Incognito Mode... 
+                & "chrome.exe" --incognito --new-window --start-maximized $url
+                Write-Output "Navigating to: $url"
+                
+                Write-Output "Getting Window Title!!!"
+                Start-Sleep -Seconds 2.5
+                $title = (Get-Process -Name chrome | Select-Object MainWindowTitle)
+                ForEach ($i in $title) { if ($i.mainWindowTitle -ne '') { $title = $i.mainWindowTitle; break; } }
+                $ffmpegTitle = 'title=' + $title
+                Write-Output "Got Browser Title: $ffmpegTitle"
 
-            # Screen Record Operation...
-            ffmpeg -f gdigrab -framerate 12 -i $ffmpegTitle -loglevel error -t $duration -s hd1080 -aspect 16:9 -an -vcodec libx264 $recordingPath\$filename.mp4
+                Write-Output "Screen Recording in Progess!!!"
+                # Screen Record Operation...
+                ffmpeg -f gdigrab -framerate 12 -i $ffmpegTitle -loglevel error -t $duration -s hd1080 -aspect 16:9 -an -vcodec libx264 $recordingPath\$filename.mp4
+                Write-Output "Screen Recording Completed!!!"
+                
+                Write-Output "Screenshot in Progess!!!"
+                # Screenshot Operation...
+                ffmpeg -i $recordingPath\$filename.mp4 -ss $screenshotTime -frames:v 1 -q:v 2 $screenshotPath\$filename.jpeg
+                Write-Output "Screenshot Taken!!!"
 
-            # Screenshot Operation...
-            ffmpeg -i $recordingPath\$filename.mp4 -ss $screenshotTime -frames:v 1 -q:v 2 $screenshotPath\$filename.jpeg
-            
-            $response = Invoke-WebRequest -SkipHeaderValidation -SkipHttpErrorCheck -SkipCertificateCheck $url
-
-            # Flags for Accept-Ranges & Content-Disposition...
-            $arFlag = $false
-            $cdFlag = $false
-            $ctFlag = $false
-    
-            if (($response.Headers.'Accept-Ranges'.Length -gt 0) -and !($response.Headers.'Accept-Ranges'.Contains('none'))) {
-                $arFlag = $true
+                ./scripts/packetcapture.ps1 0
+                Write-Output "Ended Packet Capture Operation!!!"
+                
+                Stop-Process -Name chrome
+                Write-Output "Chrome Process Ended!!!"
             }
-
-            if ($response.Headers.'Content-Type'.Length -gt 0) {
-                $ctFlag = $true
-            }
-    
-            if ($response.Headers.'Content-Disposition'.Length -ne 0) {
-                $cdFlag = $true
-            }
-    
-            # Response Log Generation...
-            $jsonfile = "$responsePath\$filename.json"
-            $response | Select-Object -Property StatusCode, StatusDescription, RawContent, Headers | ConvertTo-Json | Out-File $jsonfile
-            $response = Get-Content $jsonfile | Out-String | ConvertFrom-Json
-    
-            if ($null -ne $response) {
-                $response | Add-Member -Type NoteProperty -Name 'url' -Value $url
-            
-                # Flags Check for Downloadable-Status...
-                if ($arFlag -or $cdFlag -or $ctFlag) {
-                    $response | Add-Member -Type NoteProperty -Name 'Downloadable' -Value 'True'
-                }
-                else {
-                    $response | Add-Member -Type NoteProperty -Name 'Downloadable' -Value 'False'
-                }
-            
-                $response | ConvertTo-Json | Set-Content $jsonfile
-            }
-            else {
-                "{'url': $url,'status': 'No Response'}" > $jsonfile
-            }
-
-            Get-Job | Stop-Job
-            Remove-Job *
-            Stop-Process -Name chrome
+        }
+        catch {
+            Write-Output "--ERROR--Exception Caught For $url"
         }
     }
+
+    # Clear Console Screen
+    Clear-Host
 
     # Test Confirm/Discard Operation...
     $discardConfirm = Read-Host -Prompt "DISCARD TEST? Type [DISCARD] to DISCARD: "
@@ -158,9 +138,9 @@ if ($urls.Length -ne 0) {
         $confirmDecision = Read-Host -Prompt "Are You Sure? [Y/N]: "
         $confirmDecision = $confirmDecision.ToUpper()
         
-        if ($confirmDecision -eq 'Y') {
+        if (($confirmDecision -eq 'Y') -or ($confirmDecision -eq '')) {
             # Move All Results if Test Discarded...
-            # Remove-Item ".\results\$directoryName" -Recurse -Force
+            Copy-Item ".\urls.txt" -Destination ".\results\$directoryName\"
             Move-Item ".\results\$directoryName" -Destination ".\discardedResults\"
             Write-Output $('--' + $testName + ' Test Discarded!')
             Exit
